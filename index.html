@@ -2,102 +2,62 @@
 <html lang="sl">
 <head>
   <meta charset="UTF-8">
-  <title>Zaloga</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: Arial; margin: 0; padding: 10px; background:#f5f5f5;}
-    h1 { text-align:center; }
-    .controls { display:flex; gap:5px; margin-bottom:10px; }
-    input, select, button { padding:10px; font-size:16px; }
-    .item { background:white; padding:10px; margin-bottom:8px; border-radius:8px; }
-    .buttons button { margin-right:5px; }
-  </style>
+  <title>Zaloga</title>
+
+  <!-- PWA meta -->
   <meta name="mobile-web-app-capable" content="yes">
-<link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button { margin: 5px 0; padding: 8px; width: 100%; }
+    .artikel { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+  </style>
 </head>
 <body>
+  <h1>Zaloga</h1>
 
-<h1>Zaloga</h1>
+  <div>
+    <input id="artikel" placeholder="Artikel">
+    <input id="kolicina" placeholder="Količina" type="number">
+    <input id="skladisce" placeholder="Skladišče (Centralno/Kombi)">
+    <button onclick="dodajArtikel()">Dodaj</button>
+  </div>
 
-<div class="controls">
-  <input id="name" placeholder="Artikel">
-  <input id="qty" type="number" placeholder="Količina">
-  <select id="loc">
-    <option>Centralno</option>
-    <option>Kombi</option>
-    <option>Proizvodnja</option>
-  </select>
-  <button onclick="addItem()">Dodaj</button>
-</div>
+  <div id="seznam"></div>
 
-<div id="list"></div>
+  <script>
+    const seznam = document.getElementById('seznam');
+    const podatki = [];
 
-<script>
-let items = JSON.parse(localStorage.getItem("zaloga") || "[]");
+    function dodajArtikel() {
+      const a = document.getElementById('artikel').value;
+      const k = parseFloat(document.getElementById('kolicina').value);
+      const s = document.getElementById('skladisce').value || 'Centralno';
+      if(!a || isNaN(k)) return alert('Vnesi artikel in količino');
+      const obj = { artikel: a, kolicina: k, skladisce: s };
+      podatki.push(obj);
+      render();
+      document.getElementById('artikel').value='';
+      document.getElementById('kolicina').value='';
+    }
 
-function save() {
-  localStorage.setItem("zaloga", JSON.stringify(items));
-}
+    function render() {
+      seznam.innerHTML = '';
+      podatki.forEach((x,i) => {
+        const div = document.createElement('div');
+        div.className='artikel';
+        div.innerHTML = `${x.artikel} - ${x.kolicina} (${x.skladisce}) 
+          <button onclick="izbrisi(${i})">Izbriši</button>`;
+        seznam.appendChild(div);
+      });
+    }
 
-function render() {
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  items.forEach((item, index) => {
-    const div = document.createElement("div");
-    div.className = "item";
-
-    div.innerHTML = `
-      <b>${item.name}</b> (${item.qty}) - ${item.loc}
-      <div class="buttons">
-        <button onclick="changeQty(${index},1)">+</button>
-        <button onclick="changeQty(${index},-1)">-</button>
-        <button onclick="editQty(${index})">Uredi</button>
-        <button onclick="deleteItem(${index})">Izbriši</button>
-      </div>
-    `;
-
-    list.appendChild(div);
-  });
-}
-
-function addItem() {
-  const name = document.getElementById("name").value;
-  const qty = Number(document.getElementById("qty").value);
-  const loc = document.getElementById("loc").value;
-
-  if (!name || !qty) return;
-
-  items.push({ name, qty, loc });
-  save();
-  render();
-}
-
-function changeQty(i, delta) {
-  items[i].qty += delta;
-  save();
-  render();
-}
-
-function editQty(i) {
-  let val = prompt("Nova količina:", items[i].qty);
-  if (val !== null) {
-    items[i].qty = Number(val);
-    save();
-    render();
-  }
-}
-
-function deleteItem(i) {
-  if (confirm("Si prepričan?")) {
-    items.splice(i,1);
-    save();
-    render();
-  }
-}
-
-render();
-</script>
-
+    function izbrisi(i) {
+      podatki.splice(i,1);
+      render();
+    }
+  </script>
 </body>
 </html>
