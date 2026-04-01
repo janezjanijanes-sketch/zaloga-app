@@ -1,81 +1,122 @@
 <!DOCTYPE html>
 <html lang="sl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zaloga</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zaloga</title>
 
-  <meta name="mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json">
-
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    input, button { margin: 5px 0; padding: 10px; width: 100%; }
-    .artikel { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
-    button { cursor: pointer; }
-  </style>
+<style>
+body { font-family: Arial; padding:20px; }
+button { width:100%; padding:15px; margin:5px 0; }
+input, select { width:100%; padding:10px; margin:5px 0; }
+.item { border:1px solid #ccc; padding:10px; margin-top:5px; }
+</style>
 </head>
 
 <body>
 
 <h1>Zaloga</h1>
 
-<input id="artikel" placeholder="Artikel">
-<input id="kolicina" type="number" placeholder="Količina">
-<input id="skladisce" placeholder="Skladišče (Centralno/Kombi)">
+<div id="menu">
+<button onclick="view('skladisce')">Skladišče</button>
+<button onclick="view('proizvodnja')">Proizvodnja</button>
+<button onclick="view('kombi')">Kombi</button>
+<button onclick="view('artikli')">Artikli</button>
+</div>
 
-<button onclick="dodajArtikel()">Dodaj</button>
-
-<div id="seznam"></div>
+<div id="content"></div>
 
 <script>
 
-let podatki = JSON.parse(localStorage.getItem('zaloga')) || [];
+let data = JSON.parse(localStorage.getItem('data')) || [];
 
-const seznam = document.getElementById('seznam');
-
-function shrani() {
-  localStorage.setItem('zaloga', JSON.stringify(podatki));
+function save() {
+  localStorage.setItem('data', JSON.stringify(data));
 }
 
-function dodajArtikel() {
-  const a = document.getElementById('artikel').value;
-  const k = parseFloat(document.getElementById('kolicina').value);
-  const s = document.getElementById('skladisce').value || 'Centralno';
+function view(v) {
+  const c = document.getElementById('content');
+  c.innerHTML = '';
 
-  if(!a || isNaN(k)) return alert('Vnesi artikel in količino');
-
-  podatki.push({ artikel: a, kolicina: k, skladisce: s });
-  shrani();
-  render();
-
-  document.getElementById('artikel').value='';
-  document.getElementById('kolicina').value='';
-}
-
-function render() {
-  seznam.innerHTML = '';
-  podatki.forEach((x,i) => {
-    const div = document.createElement('div');
-    div.className='artikel';
-    div.innerHTML = `
-      ${x.artikel} - ${x.kolicina} (${x.skladisce})
-      <br>
-      <button onclick="izbrisi(${i})">Izbriši</button>
+  if(v === 'artikli') {
+    c.innerHTML = `
+      <h2>Dodaj artikel</h2>
+      <input id="ime" placeholder="Ime">
+      <input id="kg" type="number" placeholder="Kg / količina">
+      <select id="tip">
+        <option value="kolut">Kolut</option>
+        <option value="izdelek">Izdelek</option>
+      </select>
+      <select id="lokacija">
+        <option value="skladisce">Skladišče</option>
+        <option value="proizvodnja">Proizvodnja</option>
+        <option value="kombi">Kombi</option>
+      </select>
+      <button onclick="add()">Dodaj</button>
     `;
-    seznam.appendChild(div);
-  });
-}
+  }
 
-function izbrisi(i) {
-  if(confirm('Si siguren da želiš izbrisati?')) {
-    podatki.splice(i,1);
-    shrani();
-    render();
+  if(v === 'skladisce' || v === 'kombi') {
+    let filtered = data.filter(x => x.lokacija === v);
+
+    let grouped = {};
+
+    filtered.forEach(x => {
+      if(x.tip === 'izdelek') {
+        if(!grouped[x.ime]) grouped[x.ime] = 0;
+        grouped[x.ime] += x.kg;
+      }
+    });
+
+    for(let k in grouped) {
+      let div = document.createElement('div');
+      div.className='item';
+      div.innerHTML = `${k} - ${grouped[k]}`;
+      c.appendChild(div);
+    }
+  }
+
+  if(v === 'proizvodnja') {
+    let filtered = data.filter(x => x.lokacija === 'proizvodnja' && x.tip === 'kolut');
+
+    let total = filtered.reduce((a,b)=>a+b.kg,0);
+
+    let t = document.createElement('h2');
+    t.innerText = "SKUPAJ: " + total + " kg";
+    c.appendChild(t);
+
+    filtered.forEach((x,i)=>{
+      let div = document.createElement('div');
+      div.className='item';
+      div.innerHTML = `${x.ime} - ${x.kg} kg 
+      <button onclick="use(${i})">Porabi</button>`;
+      c.appendChild(div);
+    });
   }
 }
 
-render();
+function add() {
+  let ime = document.getElementById('ime').value;
+  let kg = parseFloat(document.getElementById('kg').value);
+  let tip = document.getElementById('tip').value;
+  let lokacija = document.getElementById('lokacija').value;
+
+  if(!ime || isNaN(kg)) return alert("Vnesi podatke");
+
+  data.push({ime, kg, tip, lokacija});
+  save();
+  alert("Dodano");
+}
+
+function use(i) {
+  if(confirm("Porabi kolut?")) {
+    data.splice(i,1);
+    save();
+    view('proizvodnja');
+  }
+}
+
+view('skladisce');
 
 </script>
 
