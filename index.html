@@ -5,64 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zaloga</title>
 
-  <!-- PWA meta -->
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.json">
 
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    input, button { margin: 5px 0; padding: 8px; width: 100%; }
-    .artikel { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    body { font-family: Arial; padding: 20px; }
+    input, button { margin: 5px 0; padding: 10px; width: 100%; }
+    .artikel { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+    button { cursor: pointer; }
   </style>
 </head>
+
 <body>
-  <h1>Zaloga</h1>
 
-  <div>
-    <input id="artikel" placeholder="Artikel">
-    <input id="kolicina" placeholder="Količina" type="number">
-    <input id="skladisce" placeholder="Skladišče (Centralno/Kombi)">
-    <button onclick="dodajArtikel()">Dodaj</button>
-  </div>
+<h1>Zaloga</h1>
 
-  <div id="seznam"></div>
+<input id="artikel" placeholder="Artikel">
+<input id="kolicina" type="number" placeholder="Količina">
+<input id="skladisce" placeholder="Skladišče (Centralno/Kombi)">
 
-  <script>
-    const seznam = document.getElementById('seznam');
-    const podatki = [];
+<button onclick="dodajArtikel()">Dodaj</button>
 
-    function dodajArtikel() {
-      const a = document.getElementById('artikel').value;
-      const k = parseFloat(document.getElementById('kolicina').value);
-      const s = document.getElementById('skladisce').value || 'Centralno';
-      if(!a || isNaN(k)) return alert('Vnesi artikel in količino');
-      const obj = { artikel: a, kolicina: k, skladisce: s };
-      podatki.push(obj);
-      render();
-      document.getElementById('artikel').value='';
-      document.getElementById('kolicina').value='';
-    }
+<div id="seznam"></div>
 
-    function render() {
-      seznam.innerHTML = '';
-      podatki.forEach((x,i) => {
-        const div = document.createElement('div');
-        div.className='artikel';
-        div.innerHTML = `${x.artikel} - ${x.kolicina} (${x.skladisce}) 
-          <button onclick="izbrisi(${i})">Izbriši</button>`;
-        seznam.appendChild(div);
-      });
-    }
+<script>
 
-    function izbrisi(i) {
-      podatki.splice(i,1);
-      render();
-    }
-  </script>
-  <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
+let podatki = JSON.parse(localStorage.getItem('zaloga')) || [];
+
+const seznam = document.getElementById('seznam');
+
+function shrani() {
+  localStorage.setItem('zaloga', JSON.stringify(podatki));
 }
+
+function dodajArtikel() {
+  const a = document.getElementById('artikel').value;
+  const k = parseFloat(document.getElementById('kolicina').value);
+  const s = document.getElementById('skladisce').value || 'Centralno';
+
+  if(!a || isNaN(k)) return alert('Vnesi artikel in količino');
+
+  podatki.push({ artikel: a, kolicina: k, skladisce: s });
+  shrani();
+  render();
+
+  document.getElementById('artikel').value='';
+  document.getElementById('kolicina').value='';
+}
+
+function render() {
+  seznam.innerHTML = '';
+  podatki.forEach((x,i) => {
+    const div = document.createElement('div');
+    div.className='artikel';
+    div.innerHTML = `
+      ${x.artikel} - ${x.kolicina} (${x.skladisce})
+      <br>
+      <button onclick="izbrisi(${i})">Izbriši</button>
+    `;
+    seznam.appendChild(div);
+  });
+}
+
+function izbrisi(i) {
+  if(confirm('Si siguren da želiš izbrisati?')) {
+    podatki.splice(i,1);
+    shrani();
+    render();
+  }
+}
+
+render();
+
 </script>
+
 </body>
 </html>
