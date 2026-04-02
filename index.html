@@ -7,89 +7,31 @@
 
 <style>
 body { font-family: Arial; margin:0; }
-
-.top {
-  position:fixed;
-  top:0;
-  width:100%;
-  background:#fff;
-  padding:5px;
-  border-bottom:1px solid #ccc;
-  display:flex;
-  flex-wrap:wrap;
-}
-
-.top button {
-  flex:1;
-  margin:2px;
-  padding:8px;
-  font-size:12px;
-}
-
+.top { position:fixed; top:0; width:100%; background:#fff; padding:5px; display:flex; }
+.top button { flex:1; margin:2px; padding:8px; font-size:12px; }
+.active { background:#4CAF50; color:white; }
 .content { padding:60px 10px; }
-
 .item { border:1px solid #ccc; padding:10px; margin:5px 0; }
-
-/* POPUP */
-#popup {
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-}
-
-#popupBox {
-  background:#fff;
-  margin:50px 10px;
-  padding:20px;
-}
-
-input, select {
-  width:100%;
-  padding:10px;
-  margin:5px 0;
-}
 </style>
 </head>
 
 <body>
 
 <div class="top">
-<button onclick="setView('skladisce')">Skladišče</button>
-<button onclick="setView('proizvodnja')">Proizvodnja</button>
-<button onclick="setView('kombi')">Kombi</button>
-<button onclick="openPopup()">+ Dodaj</button>
-<button onclick="exportData()">💾</button>
+<button id="skladisce" onclick="setView('skladisce')">Skladišče</button>
+<button id="proizvodnja" onclick="setView('proizvodnja')">Proizvodnja</button>
+<button id="kombi" onclick="setView('kombi')">Kombi</button>
+<button onclick="addItem()">+ Dodaj</button>
 </div>
 
-<div class="content">
-<div id="list"></div>
-</div>
-
-<!-- POPUP -->
-<div id="popup">
-  <div id="popupBox">
-    <h3>Dodaj</h3>
-    <input id="ime" placeholder="Ime">
-    <input id="kg" type="number" placeholder="Kg / količina">
-    <select id="tip">
-      <option value="kolut">Kolut</option>
-      <option value="izdelek">Izdelek</option>
-    </select>
-    <button onclick="add()">Dodaj</button>
-    <button onclick="closePopup()">Zapri</button>
-  </div>
-</div>
+<div class="content" id="list"></div>
 
 <script>
 
 let data = JSON.parse(localStorage.getItem('data')) || [];
 let current = localStorage.getItem('view') || 'skladisce';
 
-function save() {
+function save(){
   localStorage.setItem('data', JSON.stringify(data));
 }
 
@@ -99,90 +41,105 @@ function setView(v){
   render();
 }
 
-function openPopup(){
-  document.getElementById('popup').style.display='block';
-}
-
-function closePopup(){
-  document.getElementById('popup').style.display='none';
-}
-
-function add(){
-  let ime = document.getElementById('ime').value;
-  let kg = parseFloat(document.getElementById('kg').value);
-  let tip = document.getElementById('tip').value;
-
-  if(!ime || isNaN(kg)) return alert("Vnesi podatke");
-
-  data.push({
-    ime,
-    kg,
-    tip,
-    lokacija: current
+function highlight(){
+  ['skladisce','proizvodnja','kombi'].forEach(id=>{
+    document.getElementById(id).classList.remove('active');
   });
+  document.getElementById(current).classList.add('active');
+}
 
+function addItem(){
+  let ime = prompt("Ime?");
+  let kg = parseFloat(prompt("Količina?"));
+  let tip = prompt("Tip (kolut / izdelek)?");
+
+  if(!ime || isNaN(kg)) return;
+
+  data.push({ime, kg, tip, lokacija: current});
   save();
-  closePopup();
   render();
 }
 
 function render(){
+  highlight();
   let list = document.getElementById('list');
-  list.innerHTML = '';
+  list.innerHTML='';
 
-  let filtered = data.filter(x => x.lokacija === current);
+  let filtered = data.filter(x=>x.lokacija===current);
 
-  if(current === 'proizvodnja'){
+  if(current==='proizvodnja'){
     let koluti = filtered.filter(x=>x.tip==='kolut');
     let total = koluti.reduce((a,b)=>a+b.kg,0);
 
-    let t = document.createElement('h3');
-    t.innerText = "SKUPAJ: " + total + " kg";
-    list.appendChild(t);
+    list.innerHTML += `<h3>SKUPAJ: ${total} kg</h3>`;
 
     koluti.forEach((x,i)=>{
-      let div = document.createElement('div');
-      div.className='item';
-      div.innerHTML = `${x.ime} - ${x.kg} kg 
-      <button onclick="use(${i})">Porabi</button>`;
-      list.appendChild(div);
+      list.innerHTML += `
+        <div class="item">
+        ${x.ime} - ${x.kg}
+        <br>
+        <button onclick="porabi(${i})">Porabi</button>
+        </div>
+      `;
     });
+
   } else {
+
+    let izdelki = filtered.filter(x=>x.tip==='izdelek');
+
     let grouped = {};
 
-    filtered.forEach(x=>{
-      if(x.tip==='izdelek'){
-        if(!grouped[x.ime]) grouped[x.ime]=0;
-        grouped[x.ime]+=x.kg;
-      }
+    izdelki.forEach(x=>{
+      if(!grouped[x.ime]) grouped[x.ime]=0;
+      grouped[x.ime]+=x.kg;
     });
 
     for(let k in grouped){
-      let div = document.createElement('div');
-      div.className='item';
-      div.innerText = `${k} - ${grouped[k]}`;
-      list.appendChild(div);
+      list.innerHTML += `
+        <div class="item">
+        ${k} - ${grouped[k]}
+        <br>
+        ${current==='skladisce' ? `<button onclick="premik('${k}','kombi')">→ Kombi</button>`:''}
+        ${current==='kombi' ? `<button onclick="premik('${k}','skladisce')">← Skladišče</button>`:''}
+        </div>
+      `;
     }
   }
 }
 
-function use(i){
-  if(confirm("Porabi kolut?")){
-    let filtered = data.filter(x => x.lokacija === 'proizvodnja' && x.tip==='kolut');
-    let item = filtered[i];
-    let index = data.indexOf(item);
-    data.splice(index,1);
-    save();
-    render();
+function premik(ime, cilj){
+  let koliko = parseFloat(prompt("Koliko?"));
+  if(isNaN(koliko)) return;
+
+  let items = data.filter(x=>x.ime===ime && x.lokacija===current);
+
+  let sum = items.reduce((a,b)=>a+b.kg,0);
+  if(koliko > sum) return alert("Ni dovolj");
+
+  let remaining = koliko;
+
+  for(let i=0;i<items.length;i++){
+    if(remaining<=0) break;
+
+    let take = Math.min(items[i].kg, remaining);
+    items[i].kg -= take;
+    remaining -= take;
+
+    data.push({ime, kg:take, tip:'izdelek', lokacija:cilj});
   }
+
+  data = data.filter(x=>x.kg>0);
+  save();
+  render();
 }
 
-function exportData(){
-  let blob = new Blob([JSON.stringify(data)], {type:"application/json"});
-  let a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "zaloga-backup.json";
-  a.click();
+function porabi(i){
+  let koluti = data.filter(x=>x.lokacija==='proizvodnja' && x.tip==='kolut');
+  let item = koluti[i];
+  let index = data.indexOf(item);
+  data.splice(index,1);
+  save();
+  render();
 }
 
 render();
