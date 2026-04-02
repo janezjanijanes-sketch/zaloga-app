@@ -6,96 +6,63 @@
 <title>Zaloga</title>
 
 <style>
-body { font-family: Arial; padding:20px; }
-button { width:100%; padding:15px; margin:5px 0; }
-input, select { width:100%; padding:10px; margin:5px 0; }
-.item { border:1px solid #ccc; padding:10px; margin-top:5px; }
+body { font-family: Arial; margin:0; }
+.top { position:fixed; top:0; width:100%; background:#fff; padding:10px; border-bottom:1px solid #ccc; }
+button { margin:2px; padding:10px; }
+.content { padding:70px 10px; }
+.item { border:1px solid #ccc; padding:10px; margin:5px 0; }
 </style>
 </head>
 
 <body>
 
-<h1>Zaloga</h1>
-
-<div id="menu">
-<button onclick="view('skladisce')">Skladišče</button>
-<button onclick="view('proizvodnja')">Proizvodnja</button>
-<button onclick="view('kombi')">Kombi</button>
-<button onclick="view('artikli')">Artikli</button>
+<div class="top">
+<button onclick="setView('skladisce')">Skladišče</button>
+<button onclick="setView('proizvodnja')">Proizvodnja</button>
+<button onclick="setView('kombi')">Kombi</button>
+<button onclick="toggleAdd()">+ Dodaj</button>
 </div>
 
-<div id="content"></div>
+<div class="content">
+<div id="addBox" style="display:none;">
+<input id="ime" placeholder="Ime">
+<input id="kg" type="number" placeholder="Kg / količina">
+<select id="tip">
+<option value="kolut">Kolut</option>
+<option value="izdelek">Izdelek</option>
+</select>
+<select id="lokacija">
+<option value="skladisce">Skladišče</option>
+<option value="proizvodnja">Proizvodnja</option>
+<option value="kombi">Kombi</option>
+</select>
+<button onclick="add()">Dodaj</button>
+</div>
+
+<div id="list"></div>
+</div>
 
 <script>
 
 let data = JSON.parse(localStorage.getItem('data')) || [];
+let current = localStorage.getItem('view') || 'skladisce';
 
 function save() {
   localStorage.setItem('data', JSON.stringify(data));
 }
 
-function view(v) {
-  const c = document.getElementById('content');
-  c.innerHTML = '';
-
-  if(v === 'artikli') {
-    c.innerHTML = `
-      <h2>Dodaj artikel</h2>
-      <input id="ime" placeholder="Ime">
-      <input id="kg" type="number" placeholder="Kg / količina">
-      <select id="tip">
-        <option value="kolut">Kolut</option>
-        <option value="izdelek">Izdelek</option>
-      </select>
-      <select id="lokacija">
-        <option value="skladisce">Skladišče</option>
-        <option value="proizvodnja">Proizvodnja</option>
-        <option value="kombi">Kombi</option>
-      </select>
-      <button onclick="add()">Dodaj</button>
-    `;
-  }
-
-  if(v === 'skladisce' || v === 'kombi') {
-    let filtered = data.filter(x => x.lokacija === v);
-
-    let grouped = {};
-
-    filtered.forEach(x => {
-      if(x.tip === 'izdelek') {
-        if(!grouped[x.ime]) grouped[x.ime] = 0;
-        grouped[x.ime] += x.kg;
-      }
-    });
-
-    for(let k in grouped) {
-      let div = document.createElement('div');
-      div.className='item';
-      div.innerHTML = `${k} - ${grouped[k]}`;
-      c.appendChild(div);
-    }
-  }
-
-  if(v === 'proizvodnja') {
-    let filtered = data.filter(x => x.lokacija === 'proizvodnja' && x.tip === 'kolut');
-
-    let total = filtered.reduce((a,b)=>a+b.kg,0);
-
-    let t = document.createElement('h2');
-    t.innerText = "SKUPAJ: " + total + " kg";
-    c.appendChild(t);
-
-    filtered.forEach((x,i)=>{
-      let div = document.createElement('div');
-      div.className='item';
-      div.innerHTML = `${x.ime} - ${x.kg} kg 
-      <button onclick="use(${i})">Porabi</button>`;
-      c.appendChild(div);
-    });
-  }
+function setView(v){
+  current = v;
+  localStorage.setItem('view', v);
+  render();
 }
 
-function add() {
+function toggleAdd(){
+  let box = document.getElementById('addBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+function add(){
   let ime = document.getElementById('ime').value;
   let kg = parseFloat(document.getElementById('kg').value);
   let tip = document.getElementById('tip').value;
@@ -105,18 +72,61 @@ function add() {
 
   data.push({ime, kg, tip, lokacija});
   save();
-  alert("Dodano");
+  render();
 }
 
-function use(i) {
-  if(confirm("Porabi kolut?")) {
-    data.splice(i,1);
-    save();
-    view('proizvodnja');
+function render(){
+  let list = document.getElementById('list');
+  list.innerHTML = '';
+
+  let filtered = data.filter(x => x.lokacija === current);
+
+  if(current === 'proizvodnja'){
+    let koluti = filtered.filter(x=>x.tip==='kolut');
+    let total = koluti.reduce((a,b)=>a+b.kg,0);
+
+    let t = document.createElement('h3');
+    t.innerText = "SKUPAJ: " + total + " kg";
+    list.appendChild(t);
+
+    koluti.forEach((x,i)=>{
+      let div = document.createElement('div');
+      div.className='item';
+      div.innerHTML = `${x.ime} - ${x.kg} kg 
+      <button onclick="use(${i})">Porabi</button>`;
+      list.appendChild(div);
+    });
+  } else {
+    let grouped = {};
+
+    filtered.forEach(x=>{
+      if(x.tip==='izdelek'){
+        if(!grouped[x.ime]) grouped[x.ime]=0;
+        grouped[x.ime]+=x.kg;
+      }
+    });
+
+    for(let k in grouped){
+      let div = document.createElement('div');
+      div.className='item';
+      div.innerText = `${k} - ${grouped[k]}`;
+      list.appendChild(div);
+    }
   }
 }
 
-view('skladisce');
+function use(i){
+  if(confirm("Porabi kolut?")){
+    let filtered = data.filter(x => x.lokacija === 'proizvodnja' && x.tip==='kolut');
+    let item = filtered[i];
+    let index = data.indexOf(item);
+    data.splice(index,1);
+    save();
+    render();
+  }
+}
+
+render();
 
 </script>
 
