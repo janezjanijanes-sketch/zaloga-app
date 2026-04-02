@@ -21,6 +21,7 @@ button { margin:2px; padding:10px; }
 <button onclick="setView('proizvodnja')">Proizvodnja</button>
 <button onclick="setView('kombi')">Kombi</button>
 <button onclick="toggleAdd()">+ Dodaj</button>
+<button onclick="exportData()">💾</button>
 </div>
 
 <div class="content">
@@ -30,11 +31,6 @@ button { margin:2px; padding:10px; }
 <select id="tip">
 <option value="kolut">Kolut</option>
 <option value="izdelek">Izdelek</option>
-</select>
-<select id="lokacija">
-<option value="skladisce">Skladišče</option>
-<option value="proizvodnja">Proizvodnja</option>
-<option value="kombi">Kombi</option>
 </select>
 <button onclick="add()">Dodaj</button>
 </div>
@@ -66,11 +62,16 @@ function add(){
   let ime = document.getElementById('ime').value;
   let kg = parseFloat(document.getElementById('kg').value);
   let tip = document.getElementById('tip').value;
-  let lokacija = document.getElementById('lokacija').value;
 
   if(!ime || isNaN(kg)) return alert("Vnesi podatke");
 
-  data.push({ime, kg, tip, lokacija});
+  data.push({
+    ime,
+    kg,
+    tip,
+    lokacija: current
+  });
+
   save();
   render();
 }
@@ -124,6 +125,14 @@ function use(i){
     save();
     render();
   }
+}
+
+function exportData(){
+  let blob = new Blob([JSON.stringify(data)], {type:"application/json"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "zaloga-backup.json";
+  a.click();
 }
 
 render();
