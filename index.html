@@ -16,7 +16,6 @@ body { font-family: Arial; margin:0; }
 #popup {
   position:fixed;
   top:0;
-  left:0;
   width:100%;
   height:100%;
   background:rgba(0,0,0,0.5);
@@ -121,32 +120,51 @@ function render(){
     koluti.forEach((x,i)=>{
       list.innerHTML += `
         <div class="item">
-        ${x.ime} - ${x.kg}
+        ${x.ime} - ${x.kg} kg
         <br>
         <button onclick="porabi(${i})">Porabi</button>
+        <button onclick="editItem(${i}, 'proizvodnja')">Uredi</button>
+        <button onclick="deleteItem(${i}, 'proizvodnja')">Izbriši</button>
         </div>
       `;
     });
 
   } else {
 
-    let izdelki = filtered.filter(x=>x.tip==='izdelek');
+    let items = filtered.filter(x=>x.tip==='izdelek');
 
-    let grouped = {};
-
-    izdelki.forEach(x=>{
-      if(!grouped[x.ime]) grouped[x.ime]=0;
-      grouped[x.ime]+=x.kg;
-    });
-
-    for(let k in grouped){
+    items.forEach((x,i)=>{
       list.innerHTML += `
         <div class="item">
-        ${k} - ${grouped[k]}
+        ${x.ime} - ${x.kg}
+        <br>
+        ${current==='skladisce' ? `<button onclick="move(${i}, 'skladisce','kombi')">→ Kombi</button>`:''}
+        ${current==='kombi' ? `<button onclick="move(${i}, 'kombi','skladisce')">← Skladišče</button>`:''}
+        <button onclick="editItem(${i}, '${current}')">Uredi</button>
+        <button onclick="deleteItem(${i}, '${current}')">Izbriši</button>
         </div>
       `;
-    }
+    });
   }
+}
+
+function move(i, from, to){
+  let filtered = data.filter(x=>x.lokacija===from && x.tip==='izdelek');
+  let item = filtered[i];
+
+  let koliko = parseFloat(prompt("Koliko?"));
+  if(isNaN(koliko) || koliko<=0) return;
+
+  if(item.kg < koliko) return alert("Ni dovolj");
+
+  item.kg -= koliko;
+
+  data.push({ime:item.ime, kg:koliko, tip:'izdelek', lokacija:to});
+
+  data = data.filter(x=>x.kg>0);
+
+  save();
+  render();
 }
 
 function porabi(i){
@@ -154,6 +172,35 @@ function porabi(i){
   let item = koluti[i];
   let index = data.indexOf(item);
   data.splice(index,1);
+  save();
+  render();
+}
+
+function deleteItem(i, loc){
+  let filtered = data.filter(x=>x.lokacija===loc);
+  let item = filtered[i];
+  let index = data.indexOf(item);
+
+  if(confirm("Izbriši?")){
+    data.splice(index,1);
+    save();
+    render();
+  }
+}
+
+function editItem(i, loc){
+  let filtered = data.filter(x=>x.lokacija===loc);
+  let item = filtered[i];
+  let index = data.indexOf(item);
+
+  let novoIme = prompt("Ime:", item.ime);
+  let novoKg = parseFloat(prompt("Količina:", item.kg));
+
+  if(!novoIme || isNaN(novoKg)) return;
+
+  data[index].ime = novoIme;
+  data[index].kg = novoKg;
+
   save();
   render();
 }
