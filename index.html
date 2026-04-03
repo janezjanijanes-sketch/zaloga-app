@@ -7,11 +7,12 @@
 
 <style>
 body { font-family: Arial; margin:0; }
-.top { position:fixed; top:0; width:100%; background:#fff; padding:5px; display:flex; }
+.top { position:fixed; top:0; width:100%; background:#fff; padding:5px; display:flex; flex-wrap:wrap; }
 .top button { flex:1; margin:2px; padding:8px; font-size:12px; }
 .active { background:#4CAF50; color:white; }
-.content { padding:60px 10px; }
+.content { padding:70px 10px; }
 .item { border:1px solid #ccc; padding:10px; margin:5px 0; }
+.small { font-size:12px; color:gray; }
 
 #popup {
   position:fixed;
@@ -42,6 +43,7 @@ input, select {
 <button id="skladisce" onclick="setView('skladisce')">Skladišče</button>
 <button id="proizvodnja" onclick="setView('proizvodnja')">Proizvodnja</button>
 <button id="kombi" onclick="setView('kombi')">Kombi</button>
+<button onclick="setView('zgodovina')">Zgodovina</button>
 <button onclick="openPopup()">+ Dodaj</button>
 </div>
 
@@ -64,10 +66,16 @@ input, select {
 <script>
 
 let data = JSON.parse(localStorage.getItem('data')) || [];
+let log = JSON.parse(localStorage.getItem('log')) || [];
 let current = localStorage.getItem('view') || 'skladisce';
 
 function save(){
   localStorage.setItem('data', JSON.stringify(data));
+  localStorage.setItem('log', JSON.stringify(log));
+}
+
+function addLog(text){
+  log.unshift(new Date().toLocaleString() + " - " + text);
 }
 
 function setView(v){
@@ -77,10 +85,12 @@ function setView(v){
 }
 
 function highlight(){
-  ['skladisce','proizvodnja','kombi'].forEach(id=>{
-    document.getElementById(id).classList.remove('active');
+  ['skladisce','proizvodnja','kombi','zgodovina'].forEach(id=>{
+    let el = document.getElementById(id);
+    if(el) el.classList.remove('active');
   });
-  document.getElementById(current).classList.add('active');
+  let activeBtn = document.getElementById(current);
+  if(activeBtn) activeBtn.classList.add('active');
 }
 
 function openPopup(){
@@ -99,6 +109,7 @@ function add(){
   if(!ime || isNaN(kg)) return alert("Vnesi podatke");
 
   data.push({ime, kg, tip, lokacija: current});
+  addLog("Dodano: " + ime + " (" + kg + ")");
   save();
   closePopup();
   render();
@@ -108,6 +119,13 @@ function render(){
   highlight();
   let list = document.getElementById('list');
   list.innerHTML='';
+
+  if(current === 'zgodovina'){
+    log.forEach(x=>{
+      list.innerHTML += `<div class="item small">${x}</div>`;
+    });
+    return;
+  }
 
   let filtered = data.filter(x=>x.lokacija===current);
 
@@ -123,7 +141,6 @@ function render(){
         ${x.ime} - ${x.kg} kg
         <br>
         <button onclick="porabi(${i})">Porabi</button>
-        <button onclick="editItem(${i}, 'proizvodnja')">Uredi</button>
         <button onclick="deleteItem(${i}, 'proizvodnja')">Izbriši</button>
         </div>
       `;
@@ -140,7 +157,6 @@ function render(){
         <br>
         ${current==='skladisce' ? `<button onclick="move(${i}, 'skladisce','kombi')">→ Kombi</button>`:''}
         ${current==='kombi' ? `<button onclick="move(${i}, 'kombi','skladisce')">← Skladišče</button>`:''}
-        <button onclick="editItem(${i}, '${current}')">Uredi</button>
         <button onclick="deleteItem(${i}, '${current}')">Izbriši</button>
         </div>
       `;
@@ -160,6 +176,7 @@ function move(i, from, to){
   item.kg -= koliko;
 
   data.push({ime:item.ime, kg:koliko, tip:'izdelek', lokacija:to});
+  addLog("Premik: " + item.ime + " (" + koliko + ")");
 
   data = data.filter(x=>x.kg>0);
 
@@ -171,6 +188,9 @@ function porabi(i){
   let koluti = data.filter(x=>x.lokacija==='proizvodnja' && x.tip==='kolut');
   let item = koluti[i];
   let index = data.indexOf(item);
+
+  addLog("Poraba koluta: " + item.ime);
+
   data.splice(index,1);
   save();
   render();
@@ -179,30 +199,13 @@ function porabi(i){
 function deleteItem(i, loc){
   let filtered = data.filter(x=>x.lokacija===loc);
   let item = filtered[i];
-  let index = data.indexOf(item);
 
   if(confirm("Izbriši?")){
-    data.splice(index,1);
+    addLog("Izbris: " + item.ime);
+    data = data.filter(x => x !== item);
     save();
     render();
   }
-}
-
-function editItem(i, loc){
-  let filtered = data.filter(x=>x.lokacija===loc);
-  let item = filtered[i];
-  let index = data.indexOf(item);
-
-  let novoIme = prompt("Ime:", item.ime);
-  let novoKg = parseFloat(prompt("Količina:", item.kg));
-
-  if(!novoIme || isNaN(novoKg)) return;
-
-  data[index].ime = novoIme;
-  data[index].kg = novoKg;
-
-  save();
-  render();
 }
 
 render();
