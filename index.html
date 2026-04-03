@@ -10,29 +10,12 @@ body { font-family: Arial; margin:0; }
 .top { position:fixed; top:0; width:100%; background:#fff; padding:5px; display:flex; flex-wrap:wrap; }
 .top button { flex:1; margin:2px; padding:8px; font-size:12px; }
 .active { background:#4CAF50; color:white; }
-.content { padding:70px 10px; }
+.content { padding:80px 10px; }
 .item { border:1px solid #ccc; padding:10px; margin:5px 0; }
-.small { font-size:12px; color:gray; }
 
-#popup {
-  position:fixed;
-  top:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.5);
-  display:none;
-}
-
-#popupBox {
-  background:#fff;
-  margin:50px 10px;
-  padding:20px;
-}
-
-input, select {
-  width:100%;
+.quick button{
+  margin:2px;
   padding:10px;
-  margin:5px 0;
 }
 </style>
 </head>
@@ -43,39 +26,31 @@ input, select {
 <button id="skladisce" onclick="setView('skladisce')">Skladišče</button>
 <button id="proizvodnja" onclick="setView('proizvodnja')">Proizvodnja</button>
 <button id="kombi" onclick="setView('kombi')">Kombi</button>
-<button onclick="setView('zgodovina')">Zgodovina</button>
-<button onclick="openPopup()">+ Dodaj</button>
+<button id="danes" onclick="setView('danes')">Danes</button>
+<button onclick="openAdd()">+ Dodaj</button>
 </div>
 
 <div class="content" id="list"></div>
-
-<div id="popup">
-  <div id="popupBox">
-    <h3>Dodaj</h3>
-    <input id="ime" placeholder="Ime">
-    <input id="kg" type="number" placeholder="Kg / količina">
-    <select id="tip">
-      <option value="kolut">Kolut</option>
-      <option value="izdelek">Izdelek</option>
-    </select>
-    <button onclick="add()">Dodaj</button>
-    <button onclick="closePopup()">Zapri</button>
-  </div>
-</div>
 
 <script>
 
 let data = JSON.parse(localStorage.getItem('data')) || [];
 let log = JSON.parse(localStorage.getItem('log')) || [];
+let artikli = JSON.parse(localStorage.getItem('artikli')) || [];
+
 let current = localStorage.getItem('view') || 'skladisce';
 
 function save(){
   localStorage.setItem('data', JSON.stringify(data));
   localStorage.setItem('log', JSON.stringify(log));
+  localStorage.setItem('artikli', JSON.stringify(artikli));
 }
 
 function addLog(text){
-  log.unshift(new Date().toLocaleString() + " - " + text);
+  log.unshift({
+    time: new Date().toISOString(),
+    text
+  });
 }
 
 function setView(v){
@@ -85,33 +60,25 @@ function setView(v){
 }
 
 function highlight(){
-  ['skladisce','proizvodnja','kombi','zgodovina'].forEach(id=>{
+  ['skladisce','proizvodnja','kombi','danes'].forEach(id=>{
     let el = document.getElementById(id);
     if(el) el.classList.remove('active');
   });
-  let activeBtn = document.getElementById(current);
-  if(activeBtn) activeBtn.classList.add('active');
+  document.getElementById(current)?.classList.add('active');
 }
 
-function openPopup(){
-  document.getElementById('popup').style.display='block';
-}
+function openAdd(){
+  let ime = prompt("Ime artikla?");
+  if(!ime) return;
 
-function closePopup(){
-  document.getElementById('popup').style.display='none';
-}
+  let kg = parseFloat(prompt("Količina?"));
+  if(isNaN(kg)) return;
 
-function add(){
-  let ime = document.getElementById('ime').value;
-  let kg = parseFloat(document.getElementById('kg').value);
-  let tip = document.getElementById('tip').value;
-
-  if(!ime || isNaN(kg)) return alert("Vnesi podatke");
+  let tip = prompt("Tip (kolut / izdelek)?");
 
   data.push({ime, kg, tip, lokacija: current});
   addLog("Dodano: " + ime + " (" + kg + ")");
   save();
-  closePopup();
   render();
 }
 
@@ -120,10 +87,27 @@ function render(){
   let list = document.getElementById('list');
   list.innerHTML='';
 
-  if(current === 'zgodovina'){
-    log.forEach(x=>{
-      list.innerHTML += `<div class="item small">${x}</div>`;
+  if(current === 'danes'){
+    let today = new Date().toISOString().slice(0,10);
+
+    let todayLog = log.filter(x=>x.time.startsWith(today));
+
+    let grouped = {};
+
+    todayLog.forEach(x=>{
+      if(x.text.startsWith("Premik")){
+        let ime = x.text.split(": ")[1].split(" (")[0];
+        let kg = parseFloat(x.text.split("(")[1]);
+
+        if(!grouped[ime]) grouped[ime]=0;
+        grouped[ime]+=kg;
+      }
     });
+
+    for(let k in grouped){
+      list.innerHTML += `<div class="item">${k} - ${grouped[k]}</div>`;
+    }
+
     return;
   }
 
@@ -138,10 +122,8 @@ function render(){
     koluti.forEach((x,i)=>{
       list.innerHTML += `
         <div class="item">
-        ${x.ime} - ${x.kg} kg
-        <br>
+        ${x.ime} - ${x.kg}
         <button onclick="porabi(${i})">Porabi</button>
-        <button onclick="deleteItem(${i}, 'proizvodnja')">Izbriši</button>
         </div>
       `;
     });
@@ -150,36 +132,68 @@ function render(){
 
     let items = filtered.filter(x=>x.tip==='izdelek');
 
-    items.forEach((x,i)=>{
+    let grouped = {};
+
+    items.forEach(x=>{
+      if(!grouped[x.ime]) grouped[x.ime]=0;
+      grouped[x.ime]+=x.kg;
+    });
+
+    // 🔥 HITRI GUMBI
+    list.innerHTML += `<div class="quick">`;
+
+    Object.keys(grouped).forEach(k=>{
       list.innerHTML += `
-        <div class="item">
-        ${x.ime} - ${x.kg}
-        <br>
-        ${current==='skladisce' ? `<button onclick="move(${i}, 'skladisce','kombi')">→ Kombi</button>`:''}
-        ${current==='kombi' ? `<button onclick="move(${i}, 'kombi','skladisce')">← Skladišče</button>`:''}
-        <button onclick="deleteItem(${i}, '${current}')">Izbriši</button>
-        </div>
+        <button onclick="quickAdd('${k}')">${k}</button>
       `;
     });
+
+    list.innerHTML += `</div>`;
+
+    for(let k in grouped){
+      list.innerHTML += `
+        <div class="item">
+        ${k} - ${grouped[k]}
+        <br>
+        ${current==='skladisce' ? `<button onclick="move('${k}','skladisce','kombi')">→ Kombi</button>`:''}
+        ${current==='kombi' ? `<button onclick="move('${k}','kombi','skladisce')">← Skladišče</button>`:''}
+        </div>
+      `;
+    }
   }
 }
 
-function move(i, from, to){
-  let filtered = data.filter(x=>x.lokacija===from && x.tip==='izdelek');
-  let item = filtered[i];
+function quickAdd(ime){
+  let kg = parseFloat(prompt("Količina?"));
+  if(isNaN(kg)) return;
 
+  data.push({ime, kg, tip:'izdelek', lokacija: current});
+  addLog("Dodano: " + ime + " (" + kg + ")");
+  save();
+  render();
+}
+
+function move(ime, from, to){
   let koliko = parseFloat(prompt("Koliko?"));
-  if(isNaN(koliko) || koliko<=0) return;
+  if(isNaN(koliko)) return;
 
-  if(item.kg < koliko) return alert("Ni dovolj");
+  let items = data.filter(x=>x.ime===ime && x.lokacija===from);
 
-  item.kg -= koliko;
+  let remaining = koliko;
 
-  data.push({ime:item.ime, kg:koliko, tip:'izdelek', lokacija:to});
-  addLog("Premik: " + item.ime + " (" + koliko + ")");
+  for(let i=0;i<items.length;i++){
+    if(remaining<=0) break;
+
+    let take = Math.min(items[i].kg, remaining);
+    items[i].kg -= take;
+    remaining -= take;
+
+    data.push({ime, kg:take, tip:'izdelek', lokacija:to});
+  }
+
+  addLog("Premik: " + ime + " (" + koliko + ")");
 
   data = data.filter(x=>x.kg>0);
-
   save();
   render();
 }
@@ -189,23 +203,11 @@ function porabi(i){
   let item = koluti[i];
   let index = data.indexOf(item);
 
-  addLog("Poraba koluta: " + item.ime);
-
   data.splice(index,1);
+  addLog("Poraba: " + item.ime);
+
   save();
   render();
-}
-
-function deleteItem(i, loc){
-  let filtered = data.filter(x=>x.lokacija===loc);
-  let item = filtered[i];
-
-  if(confirm("Izbriši?")){
-    addLog("Izbris: " + item.ime);
-    data = data.filter(x => x !== item);
-    save();
-    render();
-  }
 }
 
 render();
