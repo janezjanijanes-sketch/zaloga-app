@@ -7,15 +7,43 @@
 
 <style>
 body { font-family: Arial; margin:0; }
-.top { position:fixed; top:0; width:100%; background:#fff; padding:5px; display:flex; flex-wrap:wrap; }
-.top button { flex:1; margin:2px; padding:8px; font-size:12px; }
-.active { background:#4CAF50; color:white; }
-.content { padding:80px 10px; }
-.item { border:1px solid #ccc; padding:10px; margin:5px 0; }
 
-.quick button{
-  margin:2px;
+.top {
+  position:fixed;
+  top:0;
+  width:100%;
+  background:#fff;
+  display:flex;
+}
+
+.top button {
+  flex:1;
   padding:10px;
+  font-size:14px;
+}
+
+.active { background:#4CAF50; color:white; }
+
+.content { padding:60px 10px; }
+
+.item {
+  border:1px solid #ccc;
+  padding:10px;
+  margin:5px 0;
+}
+
+.qty button {
+  margin:2px;
+  padding:8px;
+}
+
+.menu {
+  position:fixed;
+  top:0;
+  right:0;
+  background:white;
+  border:1px solid #ccc;
+  display:none;
 }
 </style>
 </head>
@@ -24,10 +52,14 @@ body { font-family: Arial; margin:0; }
 
 <div class="top">
 <button id="skladisce" onclick="setView('skladisce')">Skladišče</button>
-<button id="proizvodnja" onclick="setView('proizvodnja')">Proizvodnja</button>
 <button id="kombi" onclick="setView('kombi')">Kombi</button>
 <button id="danes" onclick="setView('danes')">Danes</button>
-<button onclick="openAdd()">+ Dodaj</button>
+<button onclick="toggleMenu()">⋮</button>
+</div>
+
+<div class="menu" id="menu">
+  <button onclick="setTeren()">Teren</button>
+  <button onclick="clearTeren()">Brez terena</button>
 </div>
 
 <div class="content" id="list"></div>
@@ -36,21 +68,13 @@ body { font-family: Arial; margin:0; }
 
 let data = JSON.parse(localStorage.getItem('data')) || [];
 let log = JSON.parse(localStorage.getItem('log')) || [];
-let artikli = JSON.parse(localStorage.getItem('artikli')) || [];
-
-let current = localStorage.getItem('view') || 'skladisce';
+let current = localStorage.getItem('view') || 'kombi';
+let teren = localStorage.getItem('teren') || '';
 
 function save(){
   localStorage.setItem('data', JSON.stringify(data));
   localStorage.setItem('log', JSON.stringify(log));
-  localStorage.setItem('artikli', JSON.stringify(artikli));
-}
-
-function addLog(text){
-  log.unshift({
-    time: new Date().toISOString(),
-    text
-  });
+  localStorage.setItem('teren', teren);
 }
 
 function setView(v){
@@ -59,125 +83,104 @@ function setView(v){
   render();
 }
 
-function highlight(){
-  ['skladisce','proizvodnja','kombi','danes'].forEach(id=>{
-    let el = document.getElementById(id);
-    if(el) el.classList.remove('active');
-  });
-  document.getElementById(current)?.classList.add('active');
+function toggleMenu(){
+  let m = document.getElementById('menu');
+  m.style.display = m.style.display==='block' ? 'none' : 'block';
 }
 
-function openAdd(){
-  let ime = prompt("Ime artikla?");
-  if(!ime) return;
-
-  let kg = parseFloat(prompt("Količina?"));
-  if(isNaN(kg)) return;
-
-  let tip = prompt("Tip (kolut / izdelek)?");
-
-  data.push({ime, kg, tip, lokacija: current});
-  addLog("Dodano: " + ime + " (" + kg + ")");
+function setTeren(){
+  teren = prompt("Vnesi teren (npr NM):") || '';
   save();
-  render();
+  toggleMenu();
+}
+
+function clearTeren(){
+  teren = '';
+  save();
+  toggleMenu();
+}
+
+function addLog(text, ime, kg){
+  log.unshift({
+    time: new Date().toISOString(),
+    text,
+    ime,
+    kg,
+    teren
+  });
 }
 
 function render(){
-  highlight();
   let list = document.getElementById('list');
   list.innerHTML='';
 
-  if(current === 'danes'){
+  document.querySelectorAll('.top button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(current)?.classList.add('active');
+
+  if(current==='danes'){
     let today = new Date().toISOString().slice(0,10);
 
-    let todayLog = log.filter(x=>x.time.startsWith(today));
+    let todayLog = log.filter(x=>x.time.startsWith(today) && x.text==='prodaja');
 
     let grouped = {};
-
     todayLog.forEach(x=>{
-      if(x.text.startsWith("Premik")){
-        let ime = x.text.split(": ")[1].split(" (")[0];
-        let kg = parseFloat(x.text.split("(")[1]);
-
-        if(!grouped[ime]) grouped[ime]=0;
-        grouped[ime]+=kg;
-      }
+      if(!grouped[x.ime]) grouped[x.ime]=0;
+      grouped[x.ime]+=x.kg;
     });
 
     for(let k in grouped){
       list.innerHTML += `<div class="item">${k} - ${grouped[k]}</div>`;
     }
-
     return;
   }
 
   let filtered = data.filter(x=>x.lokacija===current);
 
-  if(current==='proizvodnja'){
-    let koluti = filtered.filter(x=>x.tip==='kolut');
-    let total = koluti.reduce((a,b)=>a+b.kg,0);
-
-    list.innerHTML += `<h3>SKUPAJ: ${total} kg</h3>`;
-
-    koluti.forEach((x,i)=>{
-      list.innerHTML += `
-        <div class="item">
-        ${x.ime} - ${x.kg}
-        <button onclick="porabi(${i})">Porabi</button>
-        </div>
-      `;
-    });
-
-  } else {
-
-    let items = filtered.filter(x=>x.tip==='izdelek');
+  if(current==='kombi'){
 
     let grouped = {};
-
-    items.forEach(x=>{
+    filtered.forEach(x=>{
       if(!grouped[x.ime]) grouped[x.ime]=0;
       grouped[x.ime]+=x.kg;
     });
 
-    // 🔥 HITRI GUMBI
-    list.innerHTML += `<div class="quick">`;
-
-    Object.keys(grouped).forEach(k=>{
+    for(let k in grouped){
       list.innerHTML += `
-        <button onclick="quickAdd('${k}')">${k}</button>
+        <div class="item">
+        <b>${k}</b> - ${grouped[k]}
+        <div class="qty">
+          <button onclick="sell('${k}',1)">+1</button>
+          <button onclick="sell('${k}',5)">+5</button>
+          <button onclick="sell('${k}',10)">+10</button>
+        </div>
+        </div>
       `;
-    });
+    }
 
-    list.innerHTML += `</div>`;
+  } else {
+
+    let grouped = {};
+    filtered.forEach(x=>{
+      if(!grouped[x.ime]) grouped[x.ime]=0;
+      grouped[x.ime]+=x.kg;
+    });
 
     for(let k in grouped){
       list.innerHTML += `
         <div class="item">
         ${k} - ${grouped[k]}
-        <br>
-        ${current==='skladisce' ? `<button onclick="move('${k}','skladisce','kombi')">→ Kombi</button>`:''}
-        ${current==='kombi' ? `<button onclick="move('${k}','kombi','skladisce')">← Skladišče</button>`:''}
+        <button onclick="move('${k}')">→ Kombi</button>
         </div>
       `;
     }
   }
 }
 
-function quickAdd(ime){
-  let kg = parseFloat(prompt("Količina?"));
-  if(isNaN(kg)) return;
-
-  data.push({ime, kg, tip:'izdelek', lokacija: current});
-  addLog("Dodano: " + ime + " (" + kg + ")");
-  save();
-  render();
-}
-
-function move(ime, from, to){
+function move(ime){
   let koliko = parseFloat(prompt("Koliko?"));
   if(isNaN(koliko)) return;
 
-  let items = data.filter(x=>x.ime===ime && x.lokacija===from);
+  let items = data.filter(x=>x.ime===ime && x.lokacija==='skladisce');
 
   let remaining = koliko;
 
@@ -188,24 +191,30 @@ function move(ime, from, to){
     items[i].kg -= take;
     remaining -= take;
 
-    data.push({ime, kg:take, tip:'izdelek', lokacija:to});
+    data.push({ime, kg:take, lokacija:'kombi'});
   }
-
-  addLog("Premik: " + ime + " (" + koliko + ")");
 
   data = data.filter(x=>x.kg>0);
   save();
   render();
 }
 
-function porabi(i){
-  let koluti = data.filter(x=>x.lokacija==='proizvodnja' && x.tip==='kolut');
-  let item = koluti[i];
-  let index = data.indexOf(item);
+function sell(ime, qty){
+  let items = data.filter(x=>x.ime===ime && x.lokacija==='kombi');
 
-  data.splice(index,1);
-  addLog("Poraba: " + item.ime);
+  let remaining = qty;
 
+  for(let i=0;i<items.length;i++){
+    if(remaining<=0) break;
+
+    let take = Math.min(items[i].kg, remaining);
+    items[i].kg -= take;
+    remaining -= take;
+
+    addLog('prodaja', ime, take);
+  }
+
+  data = data.filter(x=>x.kg>0);
   save();
   render();
 }
