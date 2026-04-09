@@ -5,37 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zaloga</title>
 
+<link rel="manifest" href="manifest.json">
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+
 <style>
 body { font-family: Arial; margin:0; }
 
-.top {
-  position:fixed;
-  top:0;
-  width:100%;
-  background:#fff;
-  display:flex;
-}
-
-.top button {
-  flex:1;
-  padding:10px;
-  font-size:14px;
-}
+.top { position:fixed; top:0; width:100%; background:#fff; display:flex; }
+.top button { flex:1; padding:10px; font-size:14px; }
 
 .active { background:#4CAF50; color:white; }
 
 .content { padding:60px 10px; }
 
-.item {
-  border:1px solid #ccc;
-  padding:10px;
-  margin:5px 0;
-}
+.item { border:1px solid #ccc; padding:10px; margin:5px 0; }
 
-.qty button {
-  margin:2px;
-  padding:8px;
-}
+.qty button { margin:2px; padding:8px; }
 
 .menu {
   position:fixed;
@@ -54,6 +44,7 @@ body { font-family: Arial; margin:0; }
 <button id="skladisce" onclick="setView('skladisce')">Skladišče</button>
 <button id="kombi" onclick="setView('kombi')">Kombi</button>
 <button id="danes" onclick="setView('danes')">Danes</button>
+<button onclick="openAdd()">+ Dodaj</button>
 <button onclick="toggleMenu()">⋮</button>
 </div>
 
@@ -89,7 +80,7 @@ function toggleMenu(){
 }
 
 function setTeren(){
-  teren = prompt("Vnesi teren (npr NM):") || '';
+  teren = prompt("Teren (npr NM):") || '';
   save();
   toggleMenu();
 }
@@ -100,10 +91,21 @@ function clearTeren(){
   toggleMenu();
 }
 
-function addLog(text, ime, kg){
+function openAdd(){
+  let ime = prompt("Ime artikla?");
+  if(!ime) return;
+
+  let kg = parseFloat(prompt("Količina?"));
+  if(isNaN(kg)) return;
+
+  data.push({ime, kg, lokacija: current});
+  save();
+  render();
+}
+
+function addLog(ime, kg){
   log.unshift({
     time: new Date().toISOString(),
-    text,
     ime,
     kg,
     teren
@@ -120,7 +122,7 @@ function render(){
   if(current==='danes'){
     let today = new Date().toISOString().slice(0,10);
 
-    let todayLog = log.filter(x=>x.time.startsWith(today) && x.text==='prodaja');
+    let todayLog = log.filter(x=>x.time.startsWith(today));
 
     let grouped = {};
     todayLog.forEach(x=>{
@@ -136,15 +138,15 @@ function render(){
 
   let filtered = data.filter(x=>x.lokacija===current);
 
-  if(current==='kombi'){
+  let grouped = {};
+  filtered.forEach(x=>{
+    if(!grouped[x.ime]) grouped[x.ime]=0;
+    grouped[x.ime]+=x.kg;
+  });
 
-    let grouped = {};
-    filtered.forEach(x=>{
-      if(!grouped[x.ime]) grouped[x.ime]=0;
-      grouped[x.ime]+=x.kg;
-    });
+  for(let k in grouped){
 
-    for(let k in grouped){
+    if(current==='kombi'){
       list.innerHTML += `
         <div class="item">
         <b>${k}</b> - ${grouped[k]}
@@ -155,17 +157,7 @@ function render(){
         </div>
         </div>
       `;
-    }
-
-  } else {
-
-    let grouped = {};
-    filtered.forEach(x=>{
-      if(!grouped[x.ime]) grouped[x.ime]=0;
-      grouped[x.ime]+=x.kg;
-    });
-
-    for(let k in grouped){
+    } else {
       list.innerHTML += `
         <div class="item">
         ${k} - ${grouped[k]}
@@ -173,6 +165,7 @@ function render(){
         </div>
       `;
     }
+
   }
 }
 
@@ -211,7 +204,7 @@ function sell(ime, qty){
     items[i].kg -= take;
     remaining -= take;
 
-    addLog('prodaja', ime, take);
+    addLog(ime, take);
   }
 
   data = data.filter(x=>x.kg>0);
