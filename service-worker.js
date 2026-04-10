@@ -1,15 +1,20 @@
-{
-  "name": "Zaloga App",
-  "short_name": "Zaloga",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4CAF50",
-  "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    }
-  ]
-}
+const CACHE = "zaloga-v2";
+
+self.addEventListener("install", e => {
+  e.waitUntil(
+    caches.open(CACHE).then(cache => {
+      return cache.addAll([
+        "./",
+        "./index.html",
+        "./manifest.json",
+        "./icon-192.png"
+      ]);
+    })
+  );
+});
+
+self.addEventListener("fetch", e => {
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
+  );
+});
