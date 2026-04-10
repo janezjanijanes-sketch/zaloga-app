@@ -1,7 +1,7 @@
 {
   "name": "Zaloga App",
   "short_name": "Zaloga",
-  "start_url": "./index.html",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4CAF50",
